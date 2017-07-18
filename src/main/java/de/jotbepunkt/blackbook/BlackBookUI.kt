@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component
 import de.jotbepunkt.blackbook.navigation.NestedNavigator
 
 @Component
-@Title("Schwarzes Buch")
+@Title("Quälgeist - Schwarzes Buch")
 @PreserveOnRefresh
 @Theme("valo")
 class BlackBookUI : UI() {
