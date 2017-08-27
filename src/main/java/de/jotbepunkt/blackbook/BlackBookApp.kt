@@ -23,9 +23,9 @@ open class BlackBookApp {
         }
     }
 
-    @Bean fun servlet(): Servlet = Servlet()
+    @Bean fun servlet() = Servlet()
 
-    @Bean fun servletRegistration(): ServletRegistrationBean = ServletRegistrationBean(servlet(), "/*")
+    @Bean fun servletRegistration() = ServletRegistrationBean(servlet(), "/*")
 
 }
 
