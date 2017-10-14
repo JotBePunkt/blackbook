@@ -1,30 +1,32 @@
 package de.jotbepunkt.blackbook.masterdata
 
 import com.vaadin.data.fieldgroup.BeanFieldGroup
+import com.vaadin.data.validator.BeanValidator
 import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewChangeListener
 import com.vaadin.ui.*
-import org.springframework.data.annotation.Id
-import org.springframework.data.mongodb.repository.MongoRepository
-import java.util.*
+import de.jotbepunkt.blackbook.service.BusinessObject
+import de.jotbepunkt.blackbook.service.BusinessService
+import kotlin.reflect.KMutableProperty1
 
 /**
  * Created by bait on 07.07.17.
  */
-abstract class MasterDataEditView<T : Entity, V : MasterDataEditView<T, V, C>, C : MasterDataEditController<T, V, C>>(clazz: Class<T>) : HorizontalLayout(), View {
+abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO, V, C>,
+        C : MasterDataEditController<BO, V, C>>(val boClass: Class<BO>) : HorizontalLayout(), View {
 
     lateinit var controller: C
 
-    protected val listSelect = ListSelect()
-    protected val saveButton = Button("Save")
-    protected val addButton = Button("+")
-    protected val removeButton = Button("-")
+    private val listSelect = ListSelect()
+    private val saveButton = Button("Save")
+    private val addButton = Button("+")
+    private val removeButton = Button("-")
 
-    abstract val formElements: List<Field<out Any>>
+    abstract val formElements: Map<KMutableProperty1<BO, out Any>, Field<out Any>>
 
-    protected val formLayout = FormLayout()
+    private val formLayout = FormLayout()
 
-    val fieldGroup = BeanFieldGroup(clazz)
+    val fieldGroup = BeanFieldGroup(boClass)
 
     var isEditorEnabled: Boolean = false
         set(value) {
@@ -41,18 +43,22 @@ abstract class MasterDataEditView<T : Entity, V : MasterDataEditView<T, V, C>, C
 
         listSelect.addValueChangeListener {
             if (listSelect.value != null) {
-                controller.elementSelected(listSelect.value as T)
+                @Suppress("UNCHECKED_CAST")
+                controller.elementSelected(listSelect.value as BO)
             }
         }
+
+        listSelect.setHeight("100%")
     }
 
     override fun attach() {
         initUi()
         super.attach()
+        controller.onShow()
     }
 
     private fun initUi() {
-        formElements.forEach { formLayout.addComponent(it) }
+        formElements.values.forEach { formLayout.addComponent(it) }
         formLayout.addComponent(saveButton)
 
         val buttons = HorizontalLayout(addButton, removeButton)
@@ -70,6 +76,15 @@ abstract class MasterDataEditView<T : Entity, V : MasterDataEditView<T, V, C>, C
 
         setHeight("100%")
         setWidth("100%")
+
+        bindFields()
+    }
+
+    private fun bindFields() {
+        formElements.forEach { property, field ->
+            fieldGroup.bind(field, property.name)
+            field.addValidator(BeanValidator(boClass, property.name))
+        }
     }
 
 
@@ -79,14 +94,15 @@ abstract class MasterDataEditView<T : Entity, V : MasterDataEditView<T, V, C>, C
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun getSelectedElement(): T? = listSelect.value as T?
+    fun getSelectedElement(): BO? = listSelect.value as BO?
 
-    fun setItems(elements: List<T>) {
+    fun setItems(elements: List<BO>) {
         listSelect.removeAllItems()
         listSelect.addItems(elements)
     }
 
-    fun getEditedElement(): T {
+    fun getEditedElement(): BO {
+
         fieldGroup.commit()
         return fieldGroup.itemDataSource.bean
     }
@@ -95,28 +111,29 @@ abstract class MasterDataEditView<T : Entity, V : MasterDataEditView<T, V, C>, C
 }
 
 @Suppress("UNCHECKED_CAST")
-abstract class MasterDataEditController<T : Entity, V : MasterDataEditView<T, V, C>, C : MasterDataEditController<T, V, C>>
-(val constructor: () -> T, val view: V) {
+abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditView<BO, V, C>, C : MasterDataEditController<BO, V, C>>(val view: V) {
 
-    abstract val repo: MongoRepository<T, String>
+    abstract val dataService: BusinessService<*, BO>
 
     init {
+        @Suppress("LeakingThis")
         view.controller = this as C
     }
 
-    fun createElement(): T {
-        return constructor.invoke()
+    fun createElement(): BO {
+        return dataService.createBO()
     }
 
     fun addElement() {
         view.fieldGroup.setItemDataSource(createElement())
         view.isEditorEnabled = true
+
     }
 
     fun removeElement() {
         val selected = view.getSelectedElement()
         if (selected != null) {
-            repo.delete(selected)
+            dataService.delete(selected)
         }
 
         loadElements()
@@ -124,30 +141,29 @@ abstract class MasterDataEditController<T : Entity, V : MasterDataEditView<T, V,
     }
 
     fun loadElements() {
-        view.setItems(repo.findAll())
+        view.setItems(dataService.findAll())
     }
 
     fun saveElement() {
         val edited = view.getEditedElement()
 
-        if (edited.id == "") {
-            repo.insert(edited)
-        } else {
-            repo.save(edited)
-        }
+        dataService.save(edited)
+
         loadElements()
         view.isEditorEnabled = false
     }
 
-    fun elementSelected(value: T) {
+    fun elementSelected(value: BO) {
         view.fieldGroup.setItemDataSource(value)
         view.isEditorEnabled = true
     }
 
+    /**
+     * called when the view is shown at the UI. Can be used to initialize the UI
+     */
+
+    open fun onShow() {
+    }
+
 }
 
-abstract class Entity {
-    @Id var id: String = UUID.randomUUID().toString()
-
-
-}
