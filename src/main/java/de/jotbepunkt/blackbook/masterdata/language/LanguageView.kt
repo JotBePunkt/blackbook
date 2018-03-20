@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
 @SpringView(name = "languages")
-class LanguageView : MasterDataEditView<LanguageBusinessObject, LanguageView, LanguageController>(LanguageBusinessObject::class.java) {
+class LanguageView
+@Autowired constructor(controller: LanguageController)
+    : MasterDataEditView<LanguageBusinessObject, LanguageView, LanguageController>(LanguageBusinessObject::class.java, controller) {
 
     private val name = TextField("Name")
     private val isoCode = TextField("ISO Code")
@@ -23,6 +25,7 @@ class LanguageView : MasterDataEditView<LanguageBusinessObject, LanguageView, La
 
 @Component
 @ViewScope
-class LanguageController @Autowired constructor(override val dataService: LanguageService, view: LanguageView)
-    : MasterDataEditController<LanguageBusinessObject, LanguageView, LanguageController>(view) {
+class LanguageController
+@Autowired constructor(override val dataService: LanguageService)
+    : MasterDataEditController<LanguageBusinessObject, LanguageView, LanguageController>() {
 }

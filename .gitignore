@@ -43,7 +43,7 @@ hs_err_pid*
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/dictionaries
-
+.idea/
 # Sensitive or high-churn files:
 .idea/**/dataSources/
 .idea/**/dataSources.ids
@@ -85,4 +85,3 @@ fabric.properties
 src/main/resources/application.properties
 
 blackbook.iml
-.idea

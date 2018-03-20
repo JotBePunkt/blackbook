@@ -3,13 +3,14 @@ package de.jotbepunkt.blackbook
 import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewChangeListener
 import com.vaadin.spring.annotation.SpringView
+import com.vaadin.ui.Button
+import com.vaadin.ui.HorizontalLayout
 import com.vaadin.ui.Notification
 import com.vaadin.ui.VerticalLayout
 import de.jotbepunkt.blackbook.login.LoginController
 import org.vaadin.addon.calendar.Calendar
 import org.vaadin.addon.calendar.item.EditableCalendarItem
 import org.vaadin.addon.calendar.ui.CalendarComponentEvents
-import java.time.Duration
 import java.time.ZonedDateTime
 
 /**
@@ -18,15 +19,22 @@ import java.time.ZonedDateTime
 @SpringView(name = "calendar")
 class CalendarView(controller: LoginController) : VerticalLayout(), View {
 
-    val calendar = Calendar<EditableCalendarItem>()
+    private val calendar = Calendar<EditableCalendarItem>()
 
+    private val monthButton = Button("Month")
+    private val weekButton = Button("week")
+    private val backButton = Button("<<")
+    private val forwardButton = Button(">>")
 
     init {
+        setMargin(false)
+
+        val buttonLayout = HorizontalLayout(backButton, monthButton, weekButton, forwardButton)
+        addComponent(buttonLayout)
 
         calendar.setHeight("100%")
         calendar.setWidth("100%")
-        calendar.startDate = ZonedDateTime.now()
-        calendar.endDate = ZonedDateTime.from(ZonedDateTime.now().plus(Duration.ofDays(30)))
+        calendar.withMonth(ZonedDateTime.now().month)
 
         calendar.addListener {
             print("dies ist ein test")
@@ -37,20 +45,49 @@ class CalendarView(controller: LoginController) : VerticalLayout(), View {
         }
 
         calendar.setHandler { it: CalendarComponentEvents.DateClickEvent ->
-            Notification.show("date clicked " + it)
+            if (calendar.isMonthlyMode) {
+                calendar.withWeek(it.date)
+            } else {
+                Notification.show("Was erwartest du ws passiert wenn du hier klickst?")
+            }
         }
 
         calendar.setHandler { it: CalendarComponentEvents.WeekClick ->
-            Notification.show("week clicked " + it)
+            calendar.withWeekInYear(it.week)
         }
 
         calendar.setHandler { it: CalendarComponentEvents.RangeSelectEvent ->
-            Notification.show("range selected " + it)
+            if (calendar.isMonthlyMode) {
+                if (it.start.dayOfMonth != it.end.dayOfMonth) {
+                    Notification.show("Now we should create a multi day event")
+                } else {
+                    calendar.withWeek(it.start)
+                }
+            } else if (calendar.isWeeklyMode) {
+                Notification.show("now we should create a normal event")
+
+            }
         }
-
         addComponent(calendar)
-    }
 
+        monthButton.addClickListener { calendar.withMonth(calendar.startDate.month) }
+        backButton.addClickListener {
+            if (calendar.isMonthlyMode) {
+                val newStartDate = calendar.startDate.minusMonths(1)
+                calendar.withMonthInYear(newStartDate.month, newStartDate.year)
+            } else {
+                calendar.withWeek(calendar.startDate.minusWeeks(1))
+            }
+        }
+        forwardButton.addClickListener {
+            if (calendar.isMonthlyMode) {
+                val newStartDate = calendar.startDate.plusMonths(1)
+                calendar.withMonthInYear(newStartDate.month, newStartDate.year)
+            } else {
+                calendar.withWeek(calendar.startDate.plusWeeks(1))
+            }
+        }
+    }
 
     override fun enter(event: ViewChangeListener.ViewChangeEvent?) {
 

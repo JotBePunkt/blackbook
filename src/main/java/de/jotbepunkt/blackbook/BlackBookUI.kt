@@ -5,13 +5,16 @@ import com.vaadin.annotations.Theme
 import com.vaadin.annotations.Title
 import com.vaadin.annotations.Widgetset
 import com.vaadin.navigator.Navigator
+import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewProvider
 import com.vaadin.server.VaadinRequest
 import com.vaadin.spring.annotation.SpringUI
+import com.vaadin.spring.annotation.SpringView
 import com.vaadin.spring.annotation.SpringViewDisplay
 import com.vaadin.spring.annotation.UIScope
 import com.vaadin.ui.HorizontalLayout
 import com.vaadin.ui.UI
+import com.vaadin.ui.VerticalLayout
 import de.jotbepunkt.blackbook.navigation.NestedNavigator
 import org.springframework.context.ApplicationContext
 import org.springframework.context.ApplicationContextAware
@@ -20,7 +23,7 @@ import org.springframework.stereotype.Component
 @Component
 @Title("Schwarzes Buch")
 @PreserveOnRefresh
-@Widgetset("de.jotbepunkt.blackbook.AppWidgetSet")
+@Widgetset("de.jotbepunkt.blackbook.AppWidgetset") // note: this is casesensitive
 @Theme("valo")
 @SpringUI
 @UIScope
@@ -49,3 +52,6 @@ class BlackBookUI : UI(), ApplicationContextAware {
         }
     }
 }
+
+@SpringView
+class NullView : View, VerticalLayout()

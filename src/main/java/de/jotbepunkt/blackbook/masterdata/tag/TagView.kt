@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component
  */
 
 @SpringView(name = "tags")
-class TagView : MasterDataEditView<TagBo, TagView, TagController>(TagBo::class.java) {
+class TagView
+@Autowired constructor(controller: TagController) : MasterDataEditView<TagBo, TagView, TagController>(TagBo::class.java, controller) {
 
     private val displayName = TextField("Display name")
     private val tag = TextField("Tag")
@@ -27,5 +28,5 @@ class TagView : MasterDataEditView<TagBo, TagView, TagController>(TagBo::class.j
 
 @Component
 @ViewScope
-class TagController @Autowired constructor(view: TagView, override val dataService: TagService) :
-        MasterDataEditController<TagBo, TagView, TagController>(view)
+class TagController @Autowired constructor(override val dataService: TagService) :
+        MasterDataEditController<TagBo, TagView, TagController>()

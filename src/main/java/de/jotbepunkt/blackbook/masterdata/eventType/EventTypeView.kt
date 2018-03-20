@@ -19,7 +19,8 @@ import org.springframework.stereotype.Component
  * Created by bait on 18.07.17.
  */
 @SpringView(name = "eventTypes")
-class EventTypeView : MasterDataEditView<EventTypeBo, EventTypeView, EventTypeController>(EventTypeBo::class.java) {
+class EventTypeView
+@Autowired constructor(controller: EventTypeController) : MasterDataEditView<EventTypeBo, EventTypeView, EventTypeController>(EventTypeBo::class.java, controller) {
 
     //  title, comment, tags, publicEvent
     private val titleField = TextField("Title")
@@ -39,8 +40,8 @@ class EventTypeView : MasterDataEditView<EventTypeBo, EventTypeView, EventTypeCo
 @Component
 @ViewScope
 class EventTypeController
-@Autowired constructor(view: EventTypeView, override val dataService: EventTypeService)
-    : MasterDataEditController<EventTypeBo, EventTypeView, EventTypeController>(view) {
+@Autowired constructor(override val dataService: EventTypeService)
+    : MasterDataEditController<EventTypeBo, EventTypeView, EventTypeController>() {
 
     @Autowired lateinit var tagService: TagService
 

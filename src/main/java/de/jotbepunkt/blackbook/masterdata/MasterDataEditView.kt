@@ -14,7 +14,7 @@ import kotlin.reflect.KMutableProperty1
  * Parent for Master data edit views
  */
 abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO, V, C>,
-        C : MasterDataEditController<BO, V, C>>(boClass: Class<BO>) : HorizontalLayout(), View {
+        C : MasterDataEditController<BO, V, C>>(boClass: Class<BO>, private var controller: C) : HorizontalLayout(), View {
 
     data class Binding<BO, T>(
             val property: KMutableProperty1<BO, T>,
@@ -24,8 +24,6 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
             Binding<BO, T> = Binding(this, that)
 
     fun bind(vararg bindings: Binding<BO, out Any>) = listOf(*bindings)
-
-    lateinit var controller: C
 
     private val listSelect = ListSelect<BO>()
     private val saveButton = Button("Save")
@@ -38,9 +36,21 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
 
     private val fieldGroup = BeanValidationBinder(boClass)
 
-    var isEditorEnabled: Boolean = formLayout.isEnabled
+    var isEditorEnabled: Boolean = false
+        set(value) {
+            saveButton.isEnabled = value
+            formElements
+                    .map { it.field as Component }
+                    .forEach {
+                        it.isEnabled = value
+                    }
+            field = value
+        }
+
 
     init {
+        @Suppress("LeakingThis", "UNCHECKED_CAST")
+        controller.view = this as V
         addButton.addClickListener { controller.addElement() }
         removeButton.addClickListener { controller.removeElement() }
         saveButton.addClickListener { controller.saveElement() }
@@ -117,9 +127,11 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
 }
 
 
-abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditView<BO, V, C>, C : MasterDataEditController<BO, V, C>>(val view: V) {
+abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditView<BO, V, C>, C : MasterDataEditController<BO, V, C>> {
 
     abstract val dataService: BusinessService<*, BO>
+    lateinit var view: V
+
     var currentBusinessObject: BO? = null
         set(value) {
             if (value != null) {
@@ -139,18 +151,12 @@ abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditV
         }
 
 
-    init {
-        @Suppress("LeakingThis", "UNCHECKED_CAST")
-        view.controller = this as C
-    }
-
     private fun createElement(): BO {
         return dataService.createBO()
     }
 
     fun addElement() {
         currentBusinessObject = createElement()
-        view.isEditorEnabled = true
     }
 
     fun removeElement() {
@@ -169,12 +175,9 @@ abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditV
     }
 
     fun saveElement() {
-        val edited = currentBusinessObject
-
-        dataService.save(edited!!)
-
+        dataService.save(currentBusinessObject!!)
         loadElements()
-
+        currentBusinessObject = null
     }
 
     /**
@@ -183,6 +186,5 @@ abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditV
 
     open fun onShow() {
     }
-
 }
 

@@ -5,7 +5,7 @@ import org.springframework.data.mongodb.repository.MongoRepository
 import java.util.*
 
 interface EntityRepository<DO : Entity> : MongoRepository<DO, String> {
-    fun findByIdIn(ids: List<String>): List<DO>
+    fun findByIdIn(ids: Set<String>): List<DO>
 
 }
 

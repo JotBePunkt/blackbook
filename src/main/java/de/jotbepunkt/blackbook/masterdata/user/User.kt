@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component
  * Created by bait on 30.09.17.
  */
 @SpringView(name = "users")
-class UserView : MasterDataEditView<UserBo, UserView, UserController>(UserBo::class.java) {
+class UserView
+@Autowired constructor(controller: UserController) : MasterDataEditView<UserBo, UserView, UserController>(UserBo::class.java, controller) {
 
     val username = TextField("Login")
     val name = TextField("Name")
@@ -32,7 +33,6 @@ class UserView : MasterDataEditView<UserBo, UserView, UserController>(UserBo::cl
 @Component
 @ViewScope
 class UserController(
-        @Autowired view: UserView,
         @Autowired override val dataService: BusinessService<*, UserBo>) :
-        MasterDataEditController<UserBo, UserView, UserController>(view) {
+        MasterDataEditController<UserBo, UserView, UserController>() {
 }
