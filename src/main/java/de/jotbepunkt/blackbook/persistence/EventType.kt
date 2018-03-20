@@ -10,7 +10,7 @@ class EventType(id: String = randomId()) : Entity(id) {
 
     var title: String = ""
     var comment: String = ""
-    var tags: List<String> = ArrayList()
+    var tags: Set<String> = setOf()
     var publicEvent: Boolean = true
 
 }

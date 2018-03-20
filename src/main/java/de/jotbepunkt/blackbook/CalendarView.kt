@@ -2,39 +2,37 @@ package de.jotbepunkt.blackbook
 
 import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewChangeListener
-import com.vaadin.ui.Calendar
+import com.vaadin.spring.annotation.SpringView
 import com.vaadin.ui.Notification
 import com.vaadin.ui.VerticalLayout
-import com.vaadin.ui.components.calendar.CalendarComponentEvents
-import org.springframework.stereotype.Component
 import de.jotbepunkt.blackbook.login.LoginController
+import org.vaadin.addon.calendar.Calendar
+import org.vaadin.addon.calendar.item.EditableCalendarItem
+import org.vaadin.addon.calendar.ui.CalendarComponentEvents
 import java.time.Duration
-import java.time.Instant
-import java.util.*
+import java.time.ZonedDateTime
 
 /**
  * Main view of the calendar
  */
-//@UIScope
-//@SpringView(name = "")
-@Component("calendar")
+@SpringView(name = "calendar")
 class CalendarView(controller: LoginController) : VerticalLayout(), View {
 
-    val calendar = Calendar()
+    val calendar = Calendar<EditableCalendarItem>()
 
 
     init {
 
         calendar.setHeight("100%")
         calendar.setWidth("100%")
-        calendar.startDate = Date.from(Instant.now())
-        calendar.endDate = Date.from(Instant.now().plus(Duration.ofDays(30)))
+        calendar.startDate = ZonedDateTime.now()
+        calendar.endDate = ZonedDateTime.from(ZonedDateTime.now().plus(Duration.ofDays(30)))
 
         calendar.addListener {
             print("dies ist ein test")
         }
 
-        calendar.setHandler { it: CalendarComponentEvents.EventClick ->
+        calendar.setHandler { it: CalendarComponentEvents.ItemClickEvent ->
             Notification.show("event clicked " + it)
         }
 

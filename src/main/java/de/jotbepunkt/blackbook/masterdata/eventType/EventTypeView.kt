@@ -1,7 +1,11 @@
 package de.jotbepunkt.blackbook.masterdata.eventType
 
-import com.vaadin.data.util.converter.Converter
-import com.vaadin.ui.*
+import com.vaadin.spring.annotation.SpringView
+import com.vaadin.spring.annotation.ViewScope
+import com.vaadin.ui.CheckBox
+import com.vaadin.ui.TextArea
+import com.vaadin.ui.TextField
+import com.vaadin.ui.TwinColSelect
 import de.jotbepunkt.blackbook.masterdata.MasterDataEditController
 import de.jotbepunkt.blackbook.masterdata.MasterDataEditView
 import de.jotbepunkt.blackbook.service.EventTypeBo
@@ -10,53 +14,30 @@ import de.jotbepunkt.blackbook.service.TagBo
 import de.jotbepunkt.blackbook.service.TagService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
-import java.util.*
-import kotlin.reflect.KMutableProperty1
 
 /**
  * Created by bait on 18.07.17.
  */
-@Component("eventTypes")
+@SpringView(name = "eventTypes")
 class EventTypeView : MasterDataEditView<EventTypeBo, EventTypeView, EventTypeController>(EventTypeBo::class.java) {
 
     //  title, comment, tags, publicEvent
-    val titleField = TextField("Title")
-    val comment = TextArea("comment")
-    val tags = TwinColSelect("tags")
-    val publicEvent = CheckBox("public")
+    private val titleField = TextField("Title")
+    private val comment = TextArea("comment")
+    internal val tags = TwinColSelect<TagBo>("tags")
+    private val publicEvent = CheckBox("public")
 
-    override val formElements: Map<KMutableProperty1<EventTypeBo, out Any>, Field<out Any>>
-        get() = mapOf(
+    override val formElements: List<Binding<EventTypeBo, *>>
+        get() = bind(
                 EventTypeBo::title to titleField,
                 EventTypeBo::comment to comment,
                 EventTypeBo::tags to tags,
                 EventTypeBo::publicEvent to publicEvent
         )
-
-    init {
-        tags.isMultiSelect = true
-        tags.setConverter(object : Converter<Set<TagBo>, List<TagBo>> {
-            override fun getModelType(): Class<List<TagBo>> {
-                return List::class.java as Class<List<TagBo>>
-            }
-
-            override fun convertToPresentation(value: List<TagBo>?, targetType: Class<out Set<TagBo>>?, locale: Locale?): Set<TagBo> {
-                return value!!.toHashSet()
-            }
-
-            override fun convertToModel(value: Set<TagBo>?, targetType: Class<out List<TagBo>>?, locale: Locale?): List<TagBo> {
-                return value!!.toList()
-            }
-
-            override fun getPresentationType(): Class<Set<TagBo>> {
-                return Set::class.java as Class<Set<TagBo>>
-            }
-        } as Converter<Any, *>)
-    }
-
 }
 
 @Component
+@ViewScope
 class EventTypeController
 @Autowired constructor(view: EventTypeView, override val dataService: EventTypeService)
     : MasterDataEditController<EventTypeBo, EventTypeView, EventTypeController>(view) {
@@ -64,7 +45,6 @@ class EventTypeController
     @Autowired lateinit var tagService: TagService
 
     override fun onShow() {
-        view.tags.removeAllItems()
-        view.tags.addItems(tagService.findAll())
+        view.tags.setItems(tagService.findAll())
     }
 }

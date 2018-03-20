@@ -24,7 +24,7 @@ annotation class IgnoredForMapping
  */
 abstract class BusinessService<DO : Entity, BO : BusinessObject>(val createDO: () -> DO, val createBO: () -> BO) : Mapper<BO> {
 
-    class MapperImpl<T : BusinessObject>(
+    class MapperImpl<out T : BusinessObject>(
             override val type: KClass<out T>,
             override val mapSingle: (String) -> T,
             override val mapMultiple: (List<String>) -> List<T> = { list -> list.map(mapSingle) }
@@ -127,6 +127,13 @@ abstract class BusinessService<DO : Entity, BO : BusinessObject>(val createDO: (
         (doProperty1 as KMutableProperty1<X, T>).set(obj, value)
     }
 
+    fun toBONullable(dataObject: DO?): BO? =
+            if (dataObject == null)
+                null
+            else
+                toBO(dataObject)
+
+
     fun toBO(dataObject: DO): BO {
         val bo = createBO()
         val clazz = bo::class
@@ -227,7 +234,6 @@ interface Mapper<out T : BusinessObject> {
 abstract class BusinessObject(_id: String) {
     var id: String
         protected set
-        get
 
     init {
         id = _id
@@ -283,7 +289,7 @@ class TagService(@Autowired override val repo: EntityRepository<Tag>)
 
 class EventTypeBo(id: String = randomId(), var title: String = "",
                   var comment: String = "",
-                  var tags: List<TagBo> = arrayListOf(),
+                  var tags: Set<TagBo> = setOf(),
                   var publicEvent: Boolean = false) : BusinessObject(id) {
     override fun toString() = title
 }
@@ -303,7 +309,7 @@ class UserBo(
         @NotBlank var name: String = "") : BusinessObject(id) {
 
     @NotBlank
-    var hashedPassword: String = ""
+    private var hashedPassword: String = ""
 
     @IgnoredForMapping
     var password: String
@@ -315,9 +321,8 @@ class UserBo(
             }
         }
 
-    fun matches(password: String) {
-        encoder.matches(password, hashedPassword)
-    }
+    fun matches(password: String) =
+            encoder.matches(password, hashedPassword)
 
     private companion object Encryption {
         val encoder = StandardPasswordEncoder("bluubs")
@@ -327,9 +332,13 @@ class UserBo(
 }
 
 @Service
-class UserService(@Autowired override val repo: EntityRepository<User>)
+class UserService(@Autowired override val repo: UserRepo)
     : BusinessService<User, UserBo>({ User() }, { UserBo() }) {
     override val mappers: List<Mapper<*>>
         get() = arrayListOf()
+
+    fun findByUsername(username: String): UserBo? {
+        return toBONullable(repo.findByUsername(username))
+    }
 }
 

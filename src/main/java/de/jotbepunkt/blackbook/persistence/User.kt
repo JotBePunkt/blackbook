@@ -10,4 +10,6 @@ class User(id: String = randomId()) : Entity(id) {
     var hashedPassword: String = ""
 }
 
-interface UserRepo : EntityRepository<User>
+interface UserRepo : EntityRepository<User> {
+    fun findByUsername(username: String): User?
+}

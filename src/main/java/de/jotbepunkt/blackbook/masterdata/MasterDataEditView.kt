@@ -1,7 +1,8 @@
 package de.jotbepunkt.blackbook.masterdata
 
-import com.vaadin.data.fieldgroup.BeanFieldGroup
-import com.vaadin.data.validator.BeanValidator
+import com.vaadin.data.BeanValidationBinder
+import com.vaadin.data.HasValue
+import com.vaadin.data.ValidationException
 import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewChangeListener
 import com.vaadin.ui.*
@@ -10,31 +11,34 @@ import de.jotbepunkt.blackbook.service.BusinessService
 import kotlin.reflect.KMutableProperty1
 
 /**
- * Created by bait on 07.07.17.
+ * Parent for Master data edit views
  */
 abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO, V, C>,
-        C : MasterDataEditController<BO, V, C>>(val boClass: Class<BO>) : HorizontalLayout(), View {
+        C : MasterDataEditController<BO, V, C>>(boClass: Class<BO>) : HorizontalLayout(), View {
+
+    data class Binding<BO, T>(
+            val property: KMutableProperty1<BO, T>,
+            val field: HasValue<T>)
+
+    protected infix fun <BO, T> KMutableProperty1<BO, T>.to(that: HasValue<T>):
+            Binding<BO, T> = Binding(this, that)
+
+    fun bind(vararg bindings: Binding<BO, out Any>) = listOf(*bindings)
 
     lateinit var controller: C
 
-    private val listSelect = ListSelect()
+    private val listSelect = ListSelect<BO>()
     private val saveButton = Button("Save")
     private val addButton = Button("+")
     private val removeButton = Button("-")
 
-    abstract val formElements: Map<KMutableProperty1<BO, out Any>, Field<out Any>>
+    abstract val formElements: List<Binding<BO, *>>
 
     private val formLayout = FormLayout()
 
-    val fieldGroup = BeanFieldGroup(boClass)
+    private val fieldGroup = BeanValidationBinder(boClass)
 
-    var isEditorEnabled: Boolean = false
-        set(value) {
-            formLayout.isEnabled = value
-            if (!value) {
-                fieldGroup.setItemDataSource(controller.createElement())
-            }
-        }
+    var isEditorEnabled: Boolean = formLayout.isEnabled
 
     init {
         addButton.addClickListener { controller.addElement() }
@@ -42,10 +46,7 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
         saveButton.addClickListener { controller.saveElement() }
 
         listSelect.addValueChangeListener {
-            if (listSelect.value != null) {
-                @Suppress("UNCHECKED_CAST")
-                controller.elementSelected(listSelect.value as BO)
-            }
+            controller.currentBusinessObject = listSelect.selectedItems.firstOrNull()
         }
 
         listSelect.setHeight("100%")
@@ -58,7 +59,7 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
     }
 
     private fun initUi() {
-        formElements.values.forEach { formLayout.addComponent(it) }
+        formElements.forEach { formLayout.addComponent(it.field as Component) }
         formLayout.addComponent(saveButton)
 
         val buttons = HorizontalLayout(addButton, removeButton)
@@ -81,10 +82,17 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
     }
 
     private fun bindFields() {
-        formElements.forEach { property, field ->
-            fieldGroup.bind(field, property.name)
-            field.addValidator(BeanValidator(boClass, property.name))
+        formElements.forEach { it ->
+            bind(it)
         }
+    }
+
+    private fun <T> bind(binding: Binding<BO, T>) {
+        fieldGroup.forField(binding.field)
+                .bind(
+                        { it -> binding.property.get(it) },
+                        { it, value -> binding.property.set(it, value) }
+                )
     }
 
 
@@ -96,38 +104,53 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
     @Suppress("UNCHECKED_CAST")
     fun getSelectedElement(): BO? = listSelect.value as BO?
 
-    fun setItems(elements: List<BO>) {
-        listSelect.removeAllItems()
-        listSelect.addItems(elements)
-    }
-
-    fun getEditedElement(): BO {
-
-        fieldGroup.commit()
-        return fieldGroup.itemDataSource.bean
-    }
+    fun setItems(elements: List<BO>) =
+            listSelect.setItems(elements)
 
 
+    fun readBo(bo: BO) =
+            fieldGroup.readBean(bo)
+
+    @Throws(ValidationException::class)
+    fun writeBo(bo: BO) =
+            fieldGroup.writeBean(bo)
 }
 
-@Suppress("UNCHECKED_CAST")
+
 abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditView<BO, V, C>, C : MasterDataEditController<BO, V, C>>(val view: V) {
 
     abstract val dataService: BusinessService<*, BO>
+    var currentBusinessObject: BO? = null
+        set(value) {
+            if (value != null) {
+                view.readBo(value)
+                view.isEditorEnabled = true
+            } else {
+                view.readBo(createElement())
+                view.isEditorEnabled = false
+            }
+            field = value
+        }
+        get() = if (field != null) {
+            view.writeBo(field!!)
+            field
+        } else {
+            null
+        }
+
 
     init {
-        @Suppress("LeakingThis")
+        @Suppress("LeakingThis", "UNCHECKED_CAST")
         view.controller = this as C
     }
 
-    fun createElement(): BO {
+    private fun createElement(): BO {
         return dataService.createBO()
     }
 
     fun addElement() {
-        view.fieldGroup.setItemDataSource(createElement())
+        currentBusinessObject = createElement()
         view.isEditorEnabled = true
-
     }
 
     fun removeElement() {
@@ -137,7 +160,8 @@ abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditV
         }
 
         loadElements()
-        view.isEditorEnabled = false
+        currentBusinessObject = null
+
     }
 
     fun loadElements() {
@@ -145,17 +169,12 @@ abstract class MasterDataEditController<BO : BusinessObject, V : MasterDataEditV
     }
 
     fun saveElement() {
-        val edited = view.getEditedElement()
+        val edited = currentBusinessObject
 
-        dataService.save(edited)
+        dataService.save(edited!!)
 
         loadElements()
-        view.isEditorEnabled = false
-    }
 
-    fun elementSelected(value: BO) {
-        view.fieldGroup.setItemDataSource(value)
-        view.isEditorEnabled = true
     }
 
     /**

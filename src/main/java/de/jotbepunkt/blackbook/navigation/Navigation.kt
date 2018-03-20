@@ -3,52 +3,21 @@ package de.jotbepunkt.blackbook.navigation
 import com.vaadin.navigator.*
 import com.vaadin.shared.util.SharedUtil
 import com.vaadin.ui.Component
-import com.vaadin.ui.HorizontalLayout
 import com.vaadin.ui.UI
 
 /**
  * Interface for a nested view
  */
 
-interface NestedView : View, ViewDisplay {
-    var parent: NestedView?
-}
 
-fun NestedView.navigateTo(path: String) {
+fun View.navigateTo(path: String) {
     (UI.getCurrent().navigator as NestedNavigator).navigateTo(this, path)
-}
-
-class RootView(val viewDisplay: ViewDisplay) : NestedView {
-
-    override fun enter(event: ViewChangeListener.ViewChangeEvent?) {
-        // nothing happens, this is the root view
-    }
-
-    override fun showView(view: View?) {
-        if (view != null) {
-            viewDisplay.showView(view)
-        } else {
-            viewDisplay.showView(Navigator.EmptyView())
-        }
-
-    }
-
-    override var parent: NestedView?
-        get() = null // This is the root, so we dont have a member here
-        set(value) {}
-
 }
 
 class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
 
-    val currentNaviationStates: MutableList<String> = ArrayList()
-    val currentPath: MutableList<NestedView> = ArrayList()
-
-
-    init {
-        currentPath += RootView(display)
-        currentNaviationStates += ""
-    }
+    private val currentNavigationStates: MutableList<String> = arrayListOf("")
+    private val currentPath: MutableList<View> = arrayListOf(RootView(display))
 
     @Deprecated(message = "this does not contain any information about nesting, therefore this method is not supported",
             level = DeprecationLevel.HIDDEN,
@@ -58,54 +27,52 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
     }
 
     override fun navigateTo(navigationState: String) {
-        navigateTo(currentPath[0], navigationState)
+        navigateTo(null, navigationState)
     }
 
-    fun navigateTo(view: NestedView, path: String) {
+    fun navigateTo(relativeTo: View?, path: String) {
         val splittedPath = path.split('/')
 
         if (path.startsWith('/')) {
             // remove the first element a it is an empty string
             navigateToAbsolute(splittedPath.subList(1, splittedPath.size))
         } else {
-            navigateToRelative(view, splittedPath)
+            navigateToRelative(relativeTo, splittedPath)
         }
     }
 
-    fun navigateTo(view: NestedView, path: List<String>) {
+    fun navigateTo(view: View, path: List<String>) {
         navigateToRelative(view, path)
     }
 
-    private fun navigateToRelative(view: NestedView, path: List<String>) {
-        val parent = view.parent
+    private fun navigateToRelative(relativeToView: View?, path: List<String>) {
+        val parent = relativeToView?.parent
         if (path[0] == ".." && parent != null) {
             navigateToRelative(parent, path.subList(1, path.size))
         } else if (path[0] == ".." && parent != null) {
-            navigateToRelative(view, path.subList(1, path.size))
+            navigateToRelative(relativeToView, path.subList(1, path.size))
         } else {
-            val pathToView = getPathToView(view)
+            val pathToView = getPathToView(relativeToView)
             val absolutePath = pathToView + path
             navigateToAbsolute(absolutePath)
         }
 
     }
 
-    private fun getPathToView(view: NestedView): List<String> {
+    private fun getPathToView(view: View?): List<String> {
 
-        val toSearch = currentPath.find { it == view || (it is NestedViewWrapper && it.view == view) }
-
-        if (toSearch == null) {
-            throw IllegalArgumentException("did not find the view in the current path")
-        } else {
-            val index = currentPath.indexOf(toSearch)
-            return currentNaviationStates.subList(0, index)
+        if (view == null) {
+            return emptyList()
         }
+
+        val index = currentPath.indexOf(view)
+        return currentNavigationStates.subList(0, index)
     }
 
     private fun navigateToAbsolute(splittedPath: List<String>) {
 
         splittedPath.forEachIndexed { index, navigationState ->
-            val (longestViewName: String, viewWithLongestName: NestedView) = getView(navigationState)
+            val (longestViewName: String, viewWithLongestName: View) = getView(navigationState)
             val (parameters: String, usedNavigationState: String) = getUsedNavigationStateAndViewName(navigationState, longestViewName)
             navigateToView(viewWithLongestName, usedNavigationState, longestViewName, parameters, index)
         }
@@ -114,27 +81,31 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
     private fun getUsedNavigationStateAndViewName(navigationState: String, longestViewName: String): Pair<String, String> {
         val parameters: String
         val usedNavigationState: String
-        if (navigationState.length > longestViewName.length + 1) {
-            usedNavigationState = navigationState
-            parameters = navigationState.substring(longestViewName.length + 1)
-        } else if (navigationState.endsWith("/")) {
-            usedNavigationState = navigationState.substring(0,
-                    navigationState.length - 1)
-            parameters = ""
-        } else {
-            usedNavigationState = navigationState
-            parameters = ""
+        when {
+            navigationState.length > longestViewName.length + 1 -> {
+                usedNavigationState = navigationState
+                parameters = navigationState.substring(longestViewName.length + 1)
+            }
+            navigationState.endsWith("/") -> {
+                usedNavigationState = navigationState.substring(0,
+                        navigationState.length - 1)
+                parameters = ""
+            }
+            else -> {
+                usedNavigationState = navigationState
+                parameters = ""
+            }
         }
         return Pair(parameters, usedNavigationState)
     }
 
-    private fun navigateToView(viewWithLongestName: NestedView,
+    private fun navigateToView(viewWithLongestName: View,
                                usedNavigationState: String,
                                longestViewName: String,
                                parameters: String,
                                index: Int) {
         if (!SharedUtil.equals(getCurrentView(index), viewWithLongestName)
-                || !SharedUtil.equals(currentNaviationStates[index], usedNavigationState)) {
+                || !SharedUtil.equals(currentNavigationStates[index], usedNavigationState)) {
 
             removedUpperPathElements(index)
             navigateTo(viewWithLongestName, longestViewName, parameters, index)
@@ -146,18 +117,17 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
 
     private fun removedUpperPathElements(index: Int) {
         currentPath.removeAllIndexed { i, _ -> i > index }
-        currentNaviationStates.removeAllIndexed { i, _ -> i > index }
+        currentNavigationStates.removeAllIndexed { i, _ -> i > index }
     }
 
-    fun <E> MutableList<E>.removeAllIndexed(filter: (Int, E) -> Boolean) {
+    private fun <E> MutableList<E>.removeAllIndexed(filter: (Int, E) -> Boolean) {
         val toBeRemoved = this.filterIndexed(filter)
         this.removeAll(toBeRemoved)
 
     }
 
-
-    private fun getView(navigationState: String): Pair<String, NestedView> {
-        var (longestViewName: String?, viewWithLongestName: NestedView?) = getRegularView(navigationState)
+    private fun getView(navigationState: String): Pair<String, View> {
+        var (longestViewName: String?, viewWithLongestName: View?) = getRegularView(navigationState)
 
         if (viewWithLongestName == null && errorProvider != null) {
             val pair = getErrorView(navigationState)
@@ -174,36 +144,25 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
         return Pair(longestViewName!!, viewWithLongestName)
     }
 
-    private fun getErrorView(navigationState: String): Pair<String?, NestedView?> {
+    private fun getErrorView(navigationState: String): Pair<String?, View?> {
         val longestViewName = errorProvider?.getViewName(navigationState)
-        val viewWithLongestName = errorProvider?.getView(longestViewName) as NestedView
+        val viewWithLongestName = errorProvider?.getView(longestViewName) as View
         return Pair(longestViewName, viewWithLongestName)
     }
 
-    private fun getRegularView(navigationState: String): Pair<String?, NestedView?> {
-        val longestViewNameProvider = getViewProvider(navigationState)
+    private fun getRegularView(navigationState: String): Pair<String?, View?> {
+        val longestViewNameProvider = getViewProvider(navigationState) ?: throw IllegalStateException("View '$navigationState' does not exist")
         val longestViewName: String? = longestViewNameProvider.getViewName(navigationState)
-        var viewWithLongestName: NestedView? = null
+        var viewWithLongestName: View? = null
 
         if (longestViewName != null) {
             val view = longestViewNameProvider.getView(longestViewName)
-            if (view is NestedView) {
-                viewWithLongestName = view
-            } else {
-                viewWithLongestName = NestedViewWrapper(view)
-            }
+            viewWithLongestName = view
         }
         return Pair(longestViewName, viewWithLongestName)
     }
 
-
-    private fun getViewProvider(navigationState: String): ViewProvider {
-        val function = javaClass.superclass.getDeclaredMethod("getViewProvider", String::class.java)
-        function.isAccessible = true
-        return function.invoke(this, navigationState) as ViewProvider
-    }
-
-    private fun navigateTo(view: NestedView, viewName: String, parameters: String, index: Int) {
+    private fun navigateTo(view: View, viewName: String, parameters: String, index: Int) {
 
         val event = ViewChangeListener.ViewChangeEvent(this, getCurrentView(index + 1), view,
                 viewName, parameters)
@@ -242,13 +201,12 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
         return super.getCurrentView()
     }
 
-    fun getCurrentView(depth: Int): NestedView? {
-        if (depth < currentPath.size) {
-            return currentPath[depth]
-        } else {
-            return null
-        }
-    }
+    fun getCurrentView(depth: Int): View? =
+            if (depth < currentPath.size)
+                currentPath[depth]
+            else
+                null
+
 
     fun updateNavigationState(event: ViewChangeListener.ViewChangeEvent, index: Int) {
         val viewName = event.viewName
@@ -262,29 +220,34 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
                 stateManager.state = navigationState
             }
 
-            if (currentNaviationStates.size > index) {
-                currentNaviationStates[index] = navigationState
+            if (currentNavigationStates.size > index) {
+                currentNavigationStates[index] = navigationState
             } else {
-                currentNaviationStates += navigationState
+                currentNavigationStates += navigationState
             }
         }
     }
 }
 
-class NestedViewWrapper(val view: View) : NestedView, HorizontalLayout() {
+private class RootView(val rootDisplay: ViewDisplay) : View
 
-    override var parent: NestedView? = null
-
-    init {
-        addComponent(view as Component)
-        addStyleName("wrapper-" + view.javaClass.simpleName)
-    }
-
-    override fun enter(event: ViewChangeListener.ViewChangeEvent?) {
-        view.enter(event)
-    }
-
-    override fun showView(view: View?) {
-        throw IllegalStateException("This is not a nested view")
+private fun View.showView(view: View) {
+    when {
+        this is RootView -> rootDisplay.showView(view)
+        this is ViewDisplay -> (this as ViewDisplay).showView(view)
+        this.parent != null -> this.parent!!.showView(view)
+        else -> throw IllegalStateException("this was not expected")
     }
 }
+
+private val View.parent: View?
+    get() = (this as Component).parentView
+
+private val Component.parentView: View?
+    get() {
+        return when {
+            parent is View -> parent as View
+            parent != null -> parent.parentView
+            else -> null
+        }
+    }

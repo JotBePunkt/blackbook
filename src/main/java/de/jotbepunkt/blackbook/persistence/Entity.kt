@@ -6,6 +6,7 @@ import java.util.*
 
 interface EntityRepository<DO : Entity> : MongoRepository<DO, String> {
     fun findByIdIn(ids: List<String>): List<DO>
+
 }
 
 abstract class Entity(@Id var id: String) {
