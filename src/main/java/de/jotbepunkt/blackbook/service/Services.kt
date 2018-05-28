@@ -1,11 +1,8 @@
 package de.jotbepunkt.blackbook.service
 
-import de.jotbepunkt.blackbook.persistence.*
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.security.crypto.password.StandardPasswordEncoder
-import org.springframework.stereotype.Service
+import de.jotbepunkt.blackbook.persistence.Entity
+import de.jotbepunkt.blackbook.persistence.EntityRepository
 import java.util.*
-import javax.validation.constraints.NotBlank
 import kotlin.collections.HashSet
 import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
@@ -261,87 +258,5 @@ abstract class BusinessObject(_id: String) {
     companion object {
         fun randomId() = UUID.randomUUID().toString()
     }
-}
-
-class LanguageBusinessObject(id: String = randomId(),
-                             var name: String = "",
-                             var isoCode: String = "") : BusinessObject(id)
-
-@Service
-class LanguageService(@Autowired override val repo: EntityRepository<Language>)
-    : BusinessService<Language, LanguageBusinessObject>({ Language() }, { LanguageBusinessObject() }) {
-    override val mappers: List<Mapper<*>>
-        get() = arrayListOf()
-}
-
-class TagBo(id: String = randomId(),
-            var displayName: String = "",
-            var tag: String = "") : BusinessObject(id) {
-
-    override fun toString(): String = displayName
-}
-
-@Service
-class TagService(@Autowired override val repo: EntityRepository<Tag>)
-    : BusinessService<Tag, TagBo>({ Tag() }, { TagBo() }) {
-
-    override val mappers: List<Mapper<*>>
-        get() = arrayListOf()
-}
-
-class EventTypeBo(id: String = randomId(), var title: String = "",
-                  var comment: String = "",
-                  var tags: Set<TagBo> = setOf(),
-                  var publicEvent: Boolean = false) : BusinessObject(id) {
-    override fun toString() = title
-}
-
-@Service
-class EventTypeService(@Autowired override val repo: EventTypeRepository,
-                       @Autowired private val tagService: TagService) :
-        BusinessService<EventType, EventTypeBo>({ EventType() }, { EventTypeBo() }) {
-    override val mappers: List<Mapper<*>>
-        get() = arrayListOf(tagService)
-
-}
-
-class UserBo(
-        id: String = randomId(),
-        @NotBlank var username: String = "",
-        @NotBlank var name: String = "") : BusinessObject(id) {
-
-    @NotBlank
-    private var hashedPassword: String = ""
-
-    @IgnoredForMapping
-    var password: String
-        get() = hashedPassword
-        set(value) {
-            // if the value is the same then previously, the user did not change it
-            if (value != hashedPassword) {
-                hashedPassword = encoder.encode(value)
-            }
-        }
-
-    fun matches(password: String) =
-            encoder.matches(password, hashedPassword)
-
-    private companion object Encryption {
-        val encoder = StandardPasswordEncoder("bluubs")
-    }
-
-    override fun toString() = name
-}
-
-@Service
-class UserService(@Autowired override val repo: UserRepo)
-    : BusinessService<User, UserBo>({ User() }, { UserBo() }) {
-    override val mappers: List<Mapper<*>>
-        get() = arrayListOf()
-
-    fun findByUsername(username: String): UserBo? =
-            repo.findByUsername(username)
-                    .map { it -> toBO(it) }
-                    .orElse(null)
 }
 
