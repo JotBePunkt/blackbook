@@ -31,8 +31,10 @@ import org.springframework.stereotype.Component
 class BlackBookUI : UI(), ApplicationContextAware {
 
     private lateinit var applicationContext: ApplicationContext
-    override fun setApplicationContext(p0: ApplicationContext?) {
-        applicationContext = p0!!
+    override fun setApplicationContext(applicationContext: ApplicationContext?) {
+        if (applicationContext != null) {
+            this.applicationContext = applicationContext
+        }
     }
 
     override fun init(vaadinRequest: VaadinRequest) {

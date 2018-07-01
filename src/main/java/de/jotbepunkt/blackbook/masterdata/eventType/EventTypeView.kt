@@ -12,6 +12,8 @@ import de.jotbepunkt.blackbook.service.EventTypeBo
 import de.jotbepunkt.blackbook.service.EventTypeService
 import de.jotbepunkt.blackbook.service.TagBo
 import de.jotbepunkt.blackbook.service.TagService
+import de.jotbepunkt.blackbook.vaadin.Binding
+import de.jotbepunkt.blackbook.vaadin.to
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
@@ -28,7 +30,7 @@ class EventTypeView
     internal val tags = TwinColSelect<TagBo>("tags")
     private val publicEvent = CheckBox("public")
 
-    override val formElements: List<Binding<EventTypeBo, *>>
+    override val formElements: List<Binding<EventTypeBo, out Any>>
         get() = bind(
                 EventTypeBo::title to titleField,
                 EventTypeBo::comment to comment,
@@ -43,7 +45,8 @@ class EventTypeController
 @Autowired constructor(override val dataService: EventTypeService)
     : MasterDataEditController<EventTypeBo, EventTypeView, EventTypeController>() {
 
-    @Autowired lateinit var tagService: TagService
+    @Autowired
+    lateinit var tagService: TagService
 
     override fun onShow() {
         view.tags.setItems(tagService.findAll())

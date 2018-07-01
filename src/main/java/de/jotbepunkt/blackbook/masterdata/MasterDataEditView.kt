@@ -1,14 +1,14 @@
 package de.jotbepunkt.blackbook.masterdata
 
 import com.vaadin.data.BeanValidationBinder
-import com.vaadin.data.HasValue
 import com.vaadin.data.ValidationException
 import com.vaadin.navigator.View
 import com.vaadin.navigator.ViewChangeListener
 import com.vaadin.ui.*
 import de.jotbepunkt.blackbook.service.BusinessObject
 import de.jotbepunkt.blackbook.service.BusinessService
-import kotlin.reflect.KMutableProperty1
+import de.jotbepunkt.blackbook.vaadin.Binding
+import de.jotbepunkt.blackbook.vaadin.bind
 
 /**
  * Parent for Master data edit views
@@ -16,13 +16,7 @@ import kotlin.reflect.KMutableProperty1
 abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO, V, C>,
         C : MasterDataEditController<BO, V, C>>(boClass: Class<BO>, private var controller: C) : HorizontalLayout(), View {
 
-    data class Binding<BO, T>(
-            val property: KMutableProperty1<BO, T>,
-            val field: HasValue<T>)
-
-    protected infix fun <BO, T> KMutableProperty1<BO, T>.to(that: HasValue<T>):
-            Binding<BO, T> = Binding(this, that)
-
+    // that is just syntactical sugar
     fun bind(vararg bindings: Binding<BO, out Any>) = listOf(*bindings)
 
     private val listSelect = ListSelect<BO>()
@@ -30,11 +24,11 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
     private val addButton = Button("+")
     private val removeButton = Button("-")
 
-    abstract val formElements: List<Binding<BO, *>>
+    abstract val formElements: List<Binding<BO, out Any>>
 
     private val formLayout = FormLayout()
 
-    private val fieldGroup = BeanValidationBinder(boClass)
+    private val binder = BeanValidationBinder<BO>(boClass)
 
     var isEditorEnabled: Boolean = false
         set(value) {
@@ -88,23 +82,8 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
         setHeight("100%")
         setWidth("100%")
 
-        bindFields()
+        binder.bind(formElements)
     }
-
-    private fun bindFields() {
-        formElements.forEach { it ->
-            bind(it)
-        }
-    }
-
-    private fun <T> bind(binding: Binding<BO, T>) {
-        fieldGroup.forField(binding.field)
-                .bind(
-                        { it -> binding.property.get(it) },
-                        { it, value -> binding.property.set(it, value) }
-                )
-    }
-
 
     override fun enter(event: ViewChangeListener.ViewChangeEvent?) {
         controller.loadElements()
@@ -112,18 +91,18 @@ abstract class MasterDataEditView<BO : BusinessObject, V : MasterDataEditView<BO
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun getSelectedElement(): BO? = listSelect.value as BO?
+    fun getSelectedElement(): BO? = listSelect.value.firstOrNull()
 
     fun setItems(elements: List<BO>) =
             listSelect.setItems(elements)
 
 
     fun readBo(bo: BO) =
-            fieldGroup.readBean(bo)
+            binder.readBean(bo)
 
     @Throws(ValidationException::class)
     fun writeBo(bo: BO) =
-            fieldGroup.writeBean(bo)
+            binder.writeBean(bo)
 }
 
 

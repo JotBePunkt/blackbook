@@ -7,6 +7,7 @@ import de.jotbepunkt.blackbook.masterdata.MasterDataEditController
 import de.jotbepunkt.blackbook.masterdata.MasterDataEditView
 import de.jotbepunkt.blackbook.service.TagBo
 import de.jotbepunkt.blackbook.service.TagService
+import de.jotbepunkt.blackbook.vaadin.to
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 

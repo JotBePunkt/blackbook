@@ -1,10 +1,9 @@
 package de.jotbepunkt.blackbook.persistence
 
-import org.springframework.data.mongodb.repository.MongoRepository
 import javax.validation.constraints.Size
 
 
-interface TagRepository : MongoRepository<Tag, String> {
+interface TagRepository : EntityRepository<Tag> {
 
 }
 

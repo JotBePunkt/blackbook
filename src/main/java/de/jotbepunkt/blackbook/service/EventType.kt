@@ -5,7 +5,8 @@ import de.jotbepunkt.blackbook.persistence.EventTypeRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
-class EventTypeBo(id: String = randomId(), var title: String = "",
+class EventTypeBo(id: String = randomId(),
+                  var title: String = "",
                   var comment: String = "",
                   var tags: Set<TagBo> = setOf(),
                   var publicEvent: Boolean = false) : BusinessObject(id) {

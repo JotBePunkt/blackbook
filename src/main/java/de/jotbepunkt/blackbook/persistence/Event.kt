@@ -11,7 +11,7 @@ abstract class Event(id: String = randomId()) : Entity(id) {
 
     var fromTime: LocalTime? = null
     var length: Duration? = null
-    var date = null
+    var date: LocalDate? = null
 
     var title: String? = null
     var comment: String? = null

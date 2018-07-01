@@ -1,12 +1,12 @@
 package de.jotbepunkt.blackbook.service
 
-import de.jotbepunkt.blackbook.persistence.EntityRepository
 import de.jotbepunkt.blackbook.persistence.Tag
+import de.jotbepunkt.blackbook.persistence.TagRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
 @Service
-class TagService(@Autowired override val repo: EntityRepository<Tag>)
+class TagService(@Autowired override val repo: TagRepository)
     : BusinessService<Tag, TagBo>({ Tag() }, { TagBo() }) {
 
     override val mappers: List<Mapper<*>>

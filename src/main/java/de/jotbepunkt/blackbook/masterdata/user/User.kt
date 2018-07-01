@@ -8,6 +8,7 @@ import de.jotbepunkt.blackbook.masterdata.MasterDataEditController
 import de.jotbepunkt.blackbook.masterdata.MasterDataEditView
 import de.jotbepunkt.blackbook.service.BusinessService
 import de.jotbepunkt.blackbook.service.UserBo
+import de.jotbepunkt.blackbook.vaadin.to
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
