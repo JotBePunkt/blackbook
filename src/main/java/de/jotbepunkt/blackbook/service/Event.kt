@@ -100,13 +100,18 @@ class RepeatedEventMasterBo(id: String = randomId()) : EventBo(id) {
 
 @Service
 class SingleEventService
-@Autowired constructor(override val repo: SingleEventRepository, private val eventTypeService: EventTypeService)
+@Autowired constructor(override val repo: SingleEventRepository,
+                       private val eventTypeService: EventTypeService,
+                       private val tagService: TagService)
     : BusinessService<SingleEvent, SingleEventBo>(
         createBO = { SingleEventBo() },
         createDO = { SingleEvent() }) {
 
+
+    fun findBetween(start: LocalDate, end: LocalDate): List<SingleEventBo> = repo.findByDateBetween(start, end).map { it -> toBO(it) }
+
     override val mappers: List<Mapper<*>>
-        get() = listOf(eventTypeService)
+        get() = listOf(eventTypeService, tagService)
 }
 
 

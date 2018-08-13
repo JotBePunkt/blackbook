@@ -49,7 +49,7 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
         val parent = relativeToView?.parent
         if (path[0] == ".." && parent != null) {
             navigateToRelative(parent, path.subList(1, path.size))
-        } else if (path[0] == ".." && parent != null) {
+        } else if (path[0] == ".." && parent == null) {
             navigateToRelative(relativeToView, path.subList(1, path.size))
         } else {
             val pathToView = getPathToView(relativeToView)
@@ -151,8 +151,14 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
     }
 
     private fun getRegularView(navigationState: String): Pair<String?, View?> {
-        val longestViewNameProvider = getViewProvider(navigationState) ?: throw IllegalStateException("View '$navigationState' does not exist")
-        val longestViewName: String? = longestViewNameProvider.getViewName(navigationState)
+        // traditionally in a non-nested world, the slash is used to differentiate viewname/parameter
+        // instead of the ampersand as we do it here
+        // we don't want to rewrite the logic of getViewPrider, so we just convert the naviagation state
+        // to the traditional format
+        val traditionalNavigationState = navigationState.replace("&", "/")
+        val longestViewNameProvider = getViewProvider(traditionalNavigationState)
+                ?: throw IllegalStateException("View '$navigationState' does not exist")
+        val longestViewName: String? = longestViewNameProvider.getViewName(traditionalNavigationState)
         var viewWithLongestName: View? = null
 
         if (longestViewName != null) {
@@ -175,16 +181,11 @@ class NestedNavigator(ui: UI?, display: ViewDisplay) : Navigator(ui, display) {
         }
 
         updateNavigationState(event, index)
-
         getCurrentView(index)!!.showView(view)
-
         switchView(event)
-
-        view.enter(event)
-
-        fireAfterViewChange(event)
-
         currentPath += view
+        view.enter(event)
+        fireAfterViewChange(event)
     }
 
     private val errorProvider: ViewProvider?

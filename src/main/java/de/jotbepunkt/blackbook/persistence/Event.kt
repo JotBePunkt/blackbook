@@ -33,4 +33,6 @@ class RepeatConfig {
     var endDate: LocalDate = LocalDate.MAX
 }
 
-interface SingleEventRepository : EntityRepository<SingleEvent>
+interface SingleEventRepository : EntityRepository<SingleEvent> {
+    fun findByDateBetween(start: LocalDate, end: LocalDate): List<SingleEvent>
+}
