@@ -6,8 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
 class LanguageBusinessObject(id: String = randomId(),
-                             var name: String = "",
-                             var isoCode: String = "") : BusinessObject(id)
+                             var name: String? = null,
+                             var isoCode: String? = null) : BusinessObject(id)
 
 @Service
 class LanguageService(@Autowired override val repo: EntityRepository<Language>)

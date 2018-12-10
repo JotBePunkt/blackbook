@@ -8,8 +8,10 @@ import com.vaadin.ui.Button
 import com.vaadin.ui.HorizontalLayout
 import com.vaadin.ui.Notification
 import com.vaadin.ui.VerticalLayout
+import de.jotbepunkt.blackbook.calendar.CalendarView.EditableCalendarEvent
 import de.jotbepunkt.blackbook.navigation.navigateTo
 import de.jotbepunkt.blackbook.service.EventBo
+import de.jotbepunkt.blackbook.service.SingleEventBo
 import de.jotbepunkt.blackbook.service.SingleEventService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
@@ -41,12 +43,8 @@ class CalendarView
             ).map(::toCalenderItem)
         }
 
-        addListener {
-            print("dies ist ein test")
-        }
-
         setHandler { it: CalendarComponentEvents.ItemClickEvent ->
-            Notification.show("event clicked $it")
+            controller.editEvent(it.calendarItem as EditableCalendarEvent)
         }
 
         setHandler { it: CalendarComponentEvents.DateClickEvent ->
@@ -78,46 +76,51 @@ class CalendarView
         }
     }
 
-    private fun toCalenderItem(eventBo: EventBo): EditableCalendarItem {
-        return object : EditableCalendarItem {
-            override fun getNotifier(): EditableCalendarItem.ItemChangeNotifier? = null
-
-            override fun getEnd() = ZonedDateTime.of(eventBo.end, ZoneId.systemDefault())
-
-            override fun setCaption(caption: String?) =
-                    controller.setEventCaption(eventBo, caption)
-
-            override fun getCaption() = eventBo.title
-
-            override fun setEnd(end: ZonedDateTime?) {
-                controller.setEventEnd(eventBo, end)
-            }
-
-            override fun getStart(): ZonedDateTime = ZonedDateTime.of(eventBo.start, ZoneId.systemDefault())
-
-            override fun setDescription(description: String?) =
-                    controller.setEventDescription(eventBo, description)
-
-            override fun getDescription() = eventBo.comment
-
-            override fun getStyleName(): String? {
-                return null
-            }
-
-            override fun setStart(start: ZonedDateTime?) {
-                controller.setEventStart(eventBo, start)
-            }
-
-            override fun setAllDay(isAllDay: Boolean) {
-                controller.setAllDay(eventBo, isAllDay)
-            }
-
-            override fun setStyleName(styleName: String?) {
-                TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-            }
-
-        }
+    interface EditableCalendarEvent : EditableCalendarItem {
+        val eventBo: EventBo<*>
     }
+
+    private fun toCalenderItem(eventBo: EventBo<*>) =
+            object : EditableCalendarEvent {
+                override val eventBo: EventBo<*>
+                    get() = eventBo
+
+                override fun getNotifier(): EditableCalendarItem.ItemChangeNotifier? = null
+
+                override fun getEnd() = ZonedDateTime.of(eventBo.end, ZoneId.systemDefault())
+
+                override fun setCaption(caption: String?) =
+                        controller.setEventCaption(eventBo, caption)
+
+                override fun getCaption() = eventBo.title
+
+                override fun setEnd(end: ZonedDateTime?) {
+                    controller.setEventEnd(eventBo, end)
+                }
+
+                override fun getStart(): ZonedDateTime = ZonedDateTime.of(eventBo.start, ZoneId.systemDefault())
+
+                override fun setDescription(description: String?) =
+                        controller.setEventDescription(eventBo, description)
+
+                override fun getDescription() = eventBo.comment
+
+                override fun getStyleName(): String? {
+                    return null
+                }
+
+                override fun setStart(start: ZonedDateTime?) {
+                    controller.setEventStart(eventBo, start)
+                }
+
+                override fun setAllDay(isAllDay: Boolean) {
+                    controller.setAllDay(eventBo, isAllDay)
+                }
+
+                override fun setStyleName(styleName: String?) {
+                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+                }
+            }
 
     private val monthButton = Button("Month")
     private val weekButton = Button("week")
@@ -130,10 +133,7 @@ class CalendarView
 
         val buttonLayout = HorizontalLayout(backButton, monthButton, weekButton, forwardButton)
         addComponent(buttonLayout)
-
         calendar.withMonth(ZonedDateTime.now().month)
-
-
         addComponent(calendar)
 
         monthButton.addClickListener { calendar.withMonth(calendar.startDate.month) }
@@ -215,29 +215,38 @@ class CalendarController
         eventController.showNewEvent(start, end)
     }
 
+    fun editEvent(calendarItem: EditableCalendarEvent) {
+        eventController.editEvent(calendarItem.eventBo.id)
+    }
+
     /**
      * Loads the event between the dates. Actually it looks also for events one
      * day before the earliest day to make sure we don't miss an event over the night
      */
-    fun getEvents(from: LocalDate, to: LocalDate): List<EventBo> = singleEventService.findBetween(from.minusDays(1), to)
+    fun getEvents(from: LocalDate, to: LocalDate): List<EventBo<*>> =
+            singleEventService.findBetween(from.minusDays(1), to)
 
-    fun setEventCaption(eventBo: EventBo, caption: String?) {
+    fun setEventCaption(eventBo: EventBo<*>, caption: String?) {
         TODO("not yet implemented")
     }
 
-    fun setEventEnd(eventBo: EventBo, end: ZonedDateTime?) {
+    fun setEventEnd(eventBo: EventBo<*>, end: ZonedDateTime?) {
+        eventBo.end = LocalDateTime.from(end)
+        singleEventService.save(eventBo as SingleEventBo)
+    }
+
+    fun setEventDescription(eventBo: EventBo<*>, description: String?) {
         TODO("not yet implemented")
     }
 
-    fun setEventDescription(eventBo: EventBo, description: String?) {
+    fun setEventStart(eventBo: EventBo<*>, start: ZonedDateTime?) {
+        eventBo.start = LocalDateTime.from(start)
+        singleEventService.save(eventBo as SingleEventBo)
+    }
+
+    fun setAllDay(eventBo: EventBo<*>, allDay: Boolean) {
         TODO("not yet implemented")
     }
 
-    fun setEventStart(eventBo: EventBo, start: ZonedDateTime?) {
-        TODO("not yet implemented")
-    }
 
-    fun setAllDay(eventBo: EventBo, allDay: Boolean) {
-        TODO("not yet implemented")
-    }
 }

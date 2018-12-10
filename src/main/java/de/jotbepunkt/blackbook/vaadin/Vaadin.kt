@@ -5,11 +5,10 @@ import com.vaadin.data.HasValue
 import kotlin.reflect.KMutableProperty1
 
 data class Binding<BO, T>(
-        val property: KMutableProperty1<BO, T>,
+        val property: KMutableProperty1<BO, T?>,
         val field: HasValue<T>)
 
-infix fun <BO, T> KMutableProperty1<BO, T>.to(that: HasValue<T>):
-        Binding<BO, T> = Binding(this, that)
+infix fun <BO, T> KMutableProperty1<BO, T?>.to(that: HasValue<T>): Binding<BO, T> = Binding(this, that)
 
 fun <BO> Binder<BO>.bind(vararg bindings: Binding<BO, *>) =
         bindings.forEach { this.bindSingle(it) }

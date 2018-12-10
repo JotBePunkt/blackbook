@@ -13,9 +13,12 @@ class TagService(@Autowired override val repo: TagRepository)
         get() = arrayListOf()
 }
 
-class TagBo(id: String = randomId(),
-            var displayName: String = "",
-            var tag: String = "") : BusinessObject(id) {
+fun tagBo(initializer: TagBo.() -> Unit) =
+        TagBo().apply(initializer)
 
-    override fun toString(): String = displayName
+class TagBo(id: String = randomId(),
+            var displayName: String? = null,
+            var tag: String? = null) : BusinessObject(id) {
+
+    override fun toString(): String = displayName ?: ""
 }

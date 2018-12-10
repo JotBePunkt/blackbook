@@ -1,6 +1,5 @@
 package de.jotbepunkt.blackbook.calendar
 
-import com.vaadin.data.BeanValidationBinder
 import com.vaadin.data.HasValue
 import com.vaadin.navigator.View
 import com.vaadin.shared.ui.datefield.DateTimeResolution
@@ -8,8 +7,6 @@ import com.vaadin.spring.annotation.SpringView
 import com.vaadin.spring.annotation.ViewScope
 import com.vaadin.ui.*
 import de.jotbepunkt.blackbook.service.*
-import de.jotbepunkt.blackbook.vaadin.bind
-import de.jotbepunkt.blackbook.vaadin.to
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
@@ -19,8 +16,10 @@ import java.time.ZonedDateTime
 @Component
 @ViewScope
 class EventView
-@Autowired constructor(private val controller: EventController) : GridLayout(3, 9), View {
+@Autowired constructor(private val controller: EventController) :
+        GridLayout(3, 9), View {
 
+    val window = Window()
 
     val eventTypeComboBox = ComboBox<EventTypeBo>().apply {
         addValueChangeListener {
@@ -57,22 +56,22 @@ class EventView
         return this
     }
 
-    val saveButton = Button("save").apply {
-        addClickListener { controller.save(bo) }
-    }
+    //    val saveButton = Button("save").apply {
+//        addClickListener { controller.save(bo) }
+//    }
     val cancelButton = Button("cancel")
 
-    val binder = BeanValidationBinder<EventBo>(EventBo::class.java)
+    //val binder = BeanValidationBinder<EventBo<EventTypeBo>>(EventBo::class.java)
 
-    var bo: EventBo = SingleEventBo()
-        set(value) {
-            binder.readBean(value)
-            setViewState()
-        }
-        get() {
-            binder.writeBean(field)
-            return field
-        }
+//    var bo: EventBo<EventTypeBo> = SingleEventBo()
+//        set(value) {
+//            binder.readBean(value)
+//            setViewState()
+//        }
+//        get() {
+//            binder.writeBean(field)
+//            return field
+//        }
 
     init {
         controller.view = this
@@ -105,33 +104,37 @@ class EventView
         addComponent(tagsSelect, 2, row++)
         addComponent(publicCheckBox, 2, row++)
 
-        addComponent(HorizontalLayout(cancelButton, saveButton).apply {
-            setWidth("100%")
-            setComponentAlignment(cancelButton, Alignment.MIDDLE_RIGHT)
-            setExpandRatio(cancelButton, 1f)
-        }, 0, row, 2, row)
+//        addComponent(HorizontalLayout(cancelButton, saveButton).apply {
+//            setWidth("100%")
+//            setComponentAlignment(cancelButton, Alignment.MIDDLE_RIGHT)
+//            setExpandRatio(cancelButton, 1f)
+//        }, 0, row, 2, row)
 
-        binder.bind(
-                EventBo::start to fromDate,
-                EventBo::end to toDate,
-                EventBo::eventType to eventTypeComboBox,
-                EventBo::title to titleText,
-                EventBo::comment to commentArea,
-                EventBo::tags to tagsSelect,
-                EventBo::publicEvent to publicCheckBox,
-
-                EventBo::overrideTitle to titleOverride,
-                EventBo::overrideComment to commentOverride,
-                EventBo::overrideTags to tagsOverride,
-                EventBo::overridePublicEvent to publicOverride
-        )
+//        binder.bind(
+//                EventBo<EventTypeBo>::start to fromDate,
+//                EventBo<EventTypeBo>::end to toDate,
+//                EventBo<EventTypeBo>::parent to eventTypeComboBox,
+//                EventBo<EventTypeBo>::title to titleText,
+//                EventBo<EventTypeBo>::comment to commentArea,
+//                EventBo<EventTypeBo>::tags to tagsSelect,
+//                EventBo<EventTypeBo>::publicEvent to publicCheckBox,
+//
+//                EventBo<EventTypeBo>::overWriteTitle to titleOverride,
+//                EventBo<EventTypeBo>::overWriteComment to commentOverride,
+//                EventBo<EventTypeBo>::overWriteTags to tagsOverride,
+//                EventBo<EventTypeBo>::overWritePublicEvent to publicOverride
+//        )
     }
 
     fun show(caption: String) {
-        val window = Window(caption)
+        window.caption = caption
         window.content = this
         window.center()
         UI.getCurrent().addWindow(window)
+    }
+
+    fun unshow() {
+        UI.getCurrent().removeWindow(window)
     }
 
     fun setViewState() {
@@ -151,9 +154,11 @@ class EventView
         publicCheckBox.isReadOnly = !publicOverride.value
 
         // reread the bean so we get the non-overridden values
-        binder.writeBean(bo)
-        binder.readBean(bo)
+//        binder.writeBean(bo)
+//        binder.readBean(bo)
     }
+
+
 }
 
 @Component
@@ -163,20 +168,32 @@ class EventController
                        val eventTypeService: EventTypeService,
                        val tagService: TagService) {
     fun showNewEvent(start: ZonedDateTime, end: ZonedDateTime) {
-        view.eventTypeComboBox.setItems(eventTypeService.findAll())
-        view.tagsSelect.setItems(tagService.findAll())
+        initSelects()
 
         val bo = SingleEventBo().apply {
             this.start = LocalDateTime.from(start)
             this.end = LocalDateTime.from(end)
         }
 
-        view.bo = bo
+//        view.bo = bo
         view.show("New event")
     }
 
-    fun save(bo: EventBo) {
+    private fun initSelects() {
+        view.eventTypeComboBox.setItems(eventTypeService.findAll())
+        view.tagsSelect.setItems(tagService.findAll())
+    }
+
+    fun save(bo: EventBo<*>) {
         singleEventService.save(bo as SingleEventBo)
+        view.unshow()
+    }
+
+    fun editEvent(id: String) {
+        val eventBo = singleEventService.find(id)!!
+//        view.bo = eventBo
+        initSelects()
+        view.show("Edit event")
     }
 
     lateinit var view: EventView

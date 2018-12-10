@@ -9,14 +9,14 @@ import javax.validation.constraints.NotBlank
 
 class UserBo(
         id: String = randomId(),
-        @NotBlank var username: String = "",
-        @NotBlank var name: String = "") : BusinessObject(id) {
+        @NotBlank var username: String? = null,
+        @NotBlank var name: String? = null) : BusinessObject(id) {
 
     @NotBlank
     private var hashedPassword: String = ""
 
     @IgnoredForMapping
-    var password: String
+    var password: String?
         get() = hashedPassword
         set(value) {
             // if the value is the same then previously, the user did not change it
@@ -32,7 +32,7 @@ class UserBo(
         val encoder = StandardPasswordEncoder("bluubs")
     }
 
-    override fun toString() = name
+    override fun toString() = name ?: ""
 }
 
 @Service

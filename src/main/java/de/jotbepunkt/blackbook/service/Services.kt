@@ -2,16 +2,14 @@ package de.jotbepunkt.blackbook.service
 
 import de.jotbepunkt.blackbook.persistence.Entity
 import de.jotbepunkt.blackbook.persistence.EntityRepository
+import mu.KotlinLogging
 import java.util.*
 import kotlin.collections.HashSet
-import kotlin.reflect.KClass
-import kotlin.reflect.KMutableProperty1
-import kotlin.reflect.KProperty1
+import kotlin.reflect.*
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.isAccessible
-
 
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)
@@ -21,6 +19,10 @@ annotation class IgnoredForMapping
  * Base class for business services, that exposes an API with BO by wrapping the Repositories DO based API
  */
 abstract class BusinessService<DO : Entity, BO : BusinessObject>(private val createDO: () -> DO, val createBO: () -> BO) : Mapper<BO> {
+
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 
     class MapperImpl<out T : BusinessObject>(
             override val type: KClass<out T>,
@@ -51,26 +53,27 @@ abstract class BusinessService<DO : Entity, BO : BusinessObject>(private val cre
             HashSet(repo.findByIdIn(ids).map(this::toBO))
 
 
-    fun save(bo: BO) =
-            repo.save(toDO(bo))
+    open fun save(bo: BO): BO {
+        val dataObjectToBeSaved = toDO(bo)
+        val savedDataObject = repo.save(dataObjectToBeSaved)
+        return toBO(savedDataObject)
+    }
 
 
     fun toDO(bo: BO): DO {
         val dataObject = createDO()
 
-        bo::class.memberProperties.forEach { boProperty ->
-            mapPropertyToDo(dataObject, boProperty, bo)
-        }
+        bo::class.memberProperties
+                .filter { !it.isIgnored() }
+                .filter { it.visibility == KVisibility.PUBLIC }
+                .forEach {
+                    mapBoPropertyToDo(dataObject, it, bo)
+                }
         return dataObject
     }
 
-    private fun mapPropertyToDo(dataObject: DO, boProperty: KProperty1<out BO, Any?>, bo: BO) {
-        if (boProperty.isIgnored()) {
-            mapUnignoredBoPropertyToDo(dataObject, boProperty, bo)
-        }
-    }
 
-    private fun mapUnignoredBoPropertyToDo(dataObject: DO, boProperty: KProperty1<out BO, Any?>, bo: BO) {
+    private fun mapBoPropertyToDo(dataObject: DO, boProperty: KProperty1<out BO, Any?>, bo: BO) {
         val doProperty = dataObject::class.memberProperties.find {
             it.name == boProperty.name
                     || it.name == boProperty.name + "Id"
@@ -93,20 +96,28 @@ abstract class BusinessService<DO : Entity, BO : BusinessObject>(private val cre
                                        doProperty: KMutableProperty1<out DO, Any?>,
                                        bo: BO, dataObject: DO) {
 
-        if ((boProperty.returnType.classifier as KClass<*>).isSubclassOf(BusinessObject::class)
-                && doProperty.returnType.classifier == String::class) {
-            val value: BusinessObject = getIt(boProperty, bo)
-            setIt(doProperty, dataObject, value.id)
-        } else if (boProperty.returnType.isSubtypeOf(doProperty.returnType)) {
-            val value: Any = getIt(boProperty, bo)
-            setIt(doProperty, dataObject, value)
-        } else if (isSetMapping(boProperty, doProperty)) {
-            val value: Set<BusinessObject> = getIt(boProperty, bo)
-            setIt(doProperty, dataObject, HashSet(value.map { it.id }))
-        } else {
-            throw NotImplementedError("unable to map $boProperty to $doProperty! Mapper missing?")
+        when {
+            boPropertyIsMappedBussinesObject(boProperty, doProperty) -> {
+                val value: BusinessObject? = getIt(boProperty, bo)
+                setIt(doProperty, dataObject, value?.id)
+            }
+            boProperty.returnType.isSubtypeOf(doProperty.returnType) -> {
+                val value: Any = getIt(boProperty, bo)
+                setIt(doProperty, dataObject, value)
+            }
+            isSetMapping(boProperty, doProperty) -> {
+                val value: Set<BusinessObject>? = getIt(boProperty, bo)
+                setIt(doProperty, dataObject, value?.let { HashSet(value.map { v -> v.id }) })
+            }
+            (boProperty.returnType.classifier as KClass<*>).isSubclassOf(List::class) ->
+                throw NotImplementedError("List is not supported (yet)")
+            else -> throw NotImplementedError("unable to map $boProperty to $doProperty! Mapper missing?")
         }
     }
+
+    private fun boPropertyIsMappedBussinesObject(boProperty: KProperty1<out BO, Any?>, doProperty: KMutableProperty1<out DO, Any?>) =
+            ((boProperty.returnType.classifier as KClass<*>).isSubclassOf(BusinessObject::class)
+                    && doProperty.returnType.classifier == String::class)
 
     private fun isSetMapping(boProperty: KProperty1<out BO, Any?>, doProperty: KMutableProperty1<out DO, Any?>): Boolean {
         return ((boProperty.returnType.classifier as KClass<*>).isSubclassOf(Set::class)
@@ -134,73 +145,94 @@ abstract class BusinessService<DO : Entity, BO : BusinessObject>(private val cre
 
 
     private fun mapPropertiesOfClass(clazz: KClass<out BO>, bo: BO, dataObject: DO) {
-        clazz.memberProperties.forEach {
-            mapPropertyToBo(it, bo, dataObject)
-        }
+        clazz.memberProperties
+                .filter { !it.isIgnored() }
+                .filter { it.visibility == KVisibility.PUBLIC }
+                .also { logger.info { "mappedProperties: $it" } }
+                .forEach { mapPropertyToBo(dataObject, it, bo) }
 
-        clazz.supertypes.filter { it.classifier != Any::class }.forEach { mapPropertiesOfClass(it.classifier as KClass<out BO>, bo, dataObject) }
-    }
-
-    private fun mapPropertyToBo(boProperty: KProperty1<out BO, Any?>, bo: BO, dataObject: DO) {
-        if (boProperty.isIgnored()) {
-            mapUnignoredPropertyToBo(dataObject, boProperty, bo)
-        }
+        clazz.supertypes
+                .filter { it.classifier != Any::class }
+                .forEach { mapPropertiesOfClass(it.classifier as KClass<out BO>, bo, dataObject) }
     }
 
     private fun KProperty1<out BO, Any?>.isIgnored() =
-            this.annotations.none { it is IgnoredForMapping }
+            this.annotations.any { it is IgnoredForMapping }
 
-    private fun mapUnignoredPropertyToBo(dataObject: DO, boProperty: KProperty1<out BO, Any?>, bo: BO) {
+    private fun mapPropertyToBo(dataObject: DO, boProperty: KProperty1<out BO, Any?>, bo: BO) {
+        val doProperty = dataObject.findSimilarNamedProperty(boProperty)
+
+        if (boProperty is KMutableProperty1) {
+            mapMutablePropertyToBo(doProperty, boProperty, dataObject, bo)
+        } else {
+            throw NotImplementedError("$boProperty is not mutable")
+        }
+    }
+
+    private fun DO.findSimilarNamedProperty(boProperty: KProperty1<out BO, Any?>): KProperty1<out DO, *> {
         try {
-            val doProperty = dataObject::class.memberProperties.first {
+            return this::class.memberProperties.first {
                 arrayListOf("", "Id", "Ids").any { postfix ->
                     boProperty.name + postfix == it.name
                 }
             }
-
-            if (boProperty is KMutableProperty1) {
-                mapMutablePropertyToBo(doProperty, boProperty, dataObject, bo)
-            } else {
-                throw NotImplementedError("$boProperty is not mutable")
-            }
         } catch (e: NoSuchElementException) {
-            throw NotImplementedError("not matching property found for $boProperty")
+            throw NotImplementedError("${this::class} does not contain property with a similar name then $boProperty. Note: Only Postfixes 'Id' or 'Ids' are allowed")
         }
     }
 
     private fun mapMutablePropertyToBo(doProperty: KProperty1<out DO, Any?>, boProperty: KMutableProperty1<out BO, Any?>, dataObject: DO, bo: BO) {
-        if (boProperty.returnType.isSubtypeOf(doProperty.returnType)) {
-            val value: Any = getIt(doProperty, dataObject)
-            setIt(boProperty, bo, value)
-        } else if (isReferenceToSingleObject(boProperty, doProperty)) {
+        when {
+            boProperty.returnType.isSubtypeOf(doProperty.returnType) -> {
+                val value: Any = getIt(doProperty, dataObject)
+                setIt(boProperty, bo, value)
+            }
+            isReferenceToSingleBusinessObject(boProperty, doProperty) -> {
 
-            val mapper = findMapper(boProperty)
-            val value: String = getIt(doProperty, dataObject)
-            val mapped = mapper.mapSingle(value)
-            setIt(boProperty, bo, mapped)
+                val mapper = findMapper(boProperty)
+                val value: String? = getIt(doProperty, dataObject)
+                val mapped = value?.let { mapper.mapSingle(value) }
+                setIt(boProperty, bo, mapped)
+            }
+            isReferenceToSetOfBusinessObjects(boProperty, doProperty) -> {
 
-        } else if (isReferenceToSetOfBusinessObjects(boProperty, doProperty)) {
-
-            val mapper = findMapper(boProperty)
-            val value: Set<String> = getIt(doProperty, dataObject)
-            val mapped = mapper.mapMultiple(value)
-            setIt(boProperty, bo, mapped)
-
-        } else {
-            throw IllegalStateException("$doProperty is not mappable to $boProperty")
+                val mapper = findMapper(boProperty)
+                val value: Set<String>? = getIt(doProperty, dataObject)
+                val mapped = value?.let { mapper.mapMultiple(value) }
+                setIt(boProperty, bo, mapped)
+            }
+            isOfGenericTypeParameter(boProperty) -> {
+                //ignore this one as there are non-generic properties in the
+                // concrete class that we can set
+            }
+            else -> throw IllegalStateException("$doProperty is not mappable to $boProperty")
         }
     }
 
+    private fun isOfGenericTypeParameter(boProperty: KMutableProperty1<out BO, Any?>) =
+            boProperty.returnType.classifier is KTypeParameter
+
     private fun isReferenceToSetOfBusinessObjects(boProperty: KMutableProperty1<out BO, Any?>, doProperty: KProperty1<out DO, Any?>): Boolean {
-        return (boProperty.returnType.classifier as KClass<*>).isSubclassOf(Set::class) &&
+        return boProperty.returnType.classifier is KClass<*> &&
+                (boProperty.returnType.classifier as KClass<*>).isSubclassOf(Set::class) &&
                 (boProperty.returnType.arguments[0].type?.classifier as KClass<*>).isSubclassOf(BusinessObject::class) &&
                 (doProperty.returnType.classifier as KClass<*>).isSubclassOf(Set::class) &&
                 doProperty.returnType.arguments[0].type?.classifier == String::class
     }
 
-    private fun isReferenceToSingleObject(boProperty: KMutableProperty1<out BO, Any?>, doProperty: KProperty1<out DO, Any?>) =
-            (boProperty.returnType.classifier as KClass<*>).isSubclassOf(BusinessObject::class) &&
-                    doProperty.returnType.classifier == String::class
+    private fun isReferenceToSingleBusinessObject(boProperty: KMutableProperty1<out BO, Any?>, doProperty: KProperty1<out DO, Any?>): Boolean {
+        val classifier = boProperty.returnType.classifier
+
+        return when (classifier) {
+            is KClass<*> -> classifier.isSubclassOf(BusinessObject::class) &&
+                    doProperty.isPotentialIdProperty
+            else -> false
+        }
+    }
+
+    private val KProperty1<out DO, Any?>.isPotentialIdProperty
+        get() = this.returnType.classifier == String::class
+
 
     fun delete(bo: BO) {
         //TODO: Check for nested/dependent objects
@@ -208,14 +240,17 @@ abstract class BusinessService<DO : Entity, BO : BusinessObject>(private val cre
     }
 
     private fun findMapper(boProperty: KMutableProperty1<out BO, Any?>): Mapper<*> {
-        try {
-            return mappers.first {
-                it.type == boProperty.returnType.classifier ||
-                        it.type == boProperty.returnType.arguments[0].type!!.classifier
-            }
-        } catch (e: NoSuchElementException) {
-            throw IllegalStateException("no mapper found for $boProperty")
+
+        return mappers.firstOrNull {
+            it.type == boProperty.returnType.classifier ||
+                    ((boProperty.returnType.classifier as KClass<*>).isSubclassOf(Collection::class) &&
+                            it.type == boProperty.returnType.arguments.first().type!!.classifier)
         }
+                ?: throw IllegalStateException("no mapper found for $boProperty in " +
+                        mappers.map {
+                            it::class.simpleName + " " + it.type.simpleName
+                        })
+
     }
 
     private fun <T> Optional<T>.toNullable(): T? =
@@ -259,4 +294,3 @@ abstract class BusinessObject(_id: String) {
         fun randomId() = UUID.randomUUID().toString()
     }
 }
-
